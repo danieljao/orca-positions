@@ -1,0 +1,705 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orca Positions</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#0ea5e9">
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --card: #ffffff;
+    --text: #1a1d23;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --accent: #0ea5e9;
+    --green: #16a34a;
+    --red: #dc2626;
+    --amber: #d97706;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115;
+      --card: #171a21;
+      --text: #e8eaed;
+      --muted: #9aa3b2;
+      --border: #2a2e38;
+      --accent: #38bdf8;
+      --green: #4ade80;
+      --red: #f87171;
+      --amber: #fbbf24;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 16px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); font-size: 13px; margin: 0 0 20px; }
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  input[type=text] {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .row > div { flex: 1; min-width: 220px; }
+  button {
+    background: var(--accent);
+    color: #04202b;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.6; cursor: default; }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+  .adv-row { margin-top: 10px; }
+  #status { font-size: 13px; color: var(--muted); margin-top: 10px; min-height: 18px; }
+  #status.error { color: var(--red); }
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+  }
+  .stat { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .stat .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat .value { font-size: 20px; font-weight: 700; margin-top: 4px; }
+  .stat .value.green { color: var(--green); }
+  .position {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  .position .head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .pair { font-size: 16px; font-weight: 700; }
+  .badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 999px;
+  }
+  .badge.inrange { background: rgba(22,163,74,0.15); color: var(--green); }
+  .badge.outrange { background: rgba(220,38,38,0.15); color: var(--red); }
+  .mint-link { color: var(--muted); font-size: 11px; font-family: ui-monospace, monospace; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 12px; }
+  @media (max-width: 520px) { .cols { grid-template-columns: 1fr; } }
+  .cols h4 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  .amount-line { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
+  .amount-line .usd { color: var(--muted); font-size: 12px; }
+  .yield-line { display: flex; justify-content: space-between; font-size: 14px; padding: 4px 0; font-weight: 600; }
+  .range { font-size: 12px; color: var(--muted); margin-top: 10px; }
+  .empty, .error-box { color: var(--muted); font-size: 14px; padding: 20px; text-align: center; }
+  .error-box { color: var(--red); }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Orca Whirlpool Positions</h1>
+  <p class="subtitle">Enter a Solana wallet address to see its open Orca concentrated-liquidity positions and pending yield (uncollected fees + rewards), read directly from the chain. Nothing is sent anywhere except read-only RPC calls.</p>
+
+  <div class="panel">
+    <div class="row">
+      <div>
+        <label for="rpc">RPC endpoint (required)</label>
+        <input type="text" id="rpc" placeholder="https://your-endpoint.example.com/?api-key=...">
+      </div>
+    </div>
+    <p class="subtitle" style="margin: 8px 0 0;">Solana's public RPC now blocks direct browser requests, so you need your own free endpoint. Sign up for a free account at <strong>Helius</strong>, <strong>QuickNode</strong>, <strong>Alchemy</strong>, or <strong>Triton</strong>, copy the HTTPS RPC URL they give you, and paste it above. It's saved locally in this browser so you only need to do this once.</p>
+    <div class="row" style="margin-top: 14px;">
+      <div>
+        <label for="wallet">Wallet address</label>
+        <input type="text" id="wallet" placeholder="e.g. 9xQeWvG816bUx9EPjHm...">
+      </div>
+      <div style="flex: 0 0 auto; display: flex; gap: 8px;">
+        <button id="loadBtn">Load positions</button>
+        <button id="clearWalletBtn" style="background: transparent; color: var(--muted); border: 1px solid var(--border);">Delete</button>
+      </div>
+    </div>
+    <div id="status"></div>
+  </div>
+
+  <div id="summaryPanel"></div>
+  <div id="positions"></div>
+</div>
+
+<script type="module">
+const WHIRLPOOL_PROGRAM = "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc";
+const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+const TOKEN_2022_PROGRAM = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
+const PDA_BUMP_TRIES = 24;
+const TICK_SIZE = 113;
+const TICKS_PER_ARRAY = 88;
+const MASK64 = (1n << 64n) - 1n;
+const MASK128 = (1n << 128n) - 1n;
+
+const walletInput = document.getElementById("wallet");
+const rpcInput = document.getElementById("rpc");
+const loadBtn = document.getElementById("loadBtn");
+const clearWalletBtn = document.getElementById("clearWalletBtn");
+const statusEl = document.getElementById("status");
+const summaryEl = document.getElementById("summaryPanel");
+const positionsEl = document.getElementById("positions");
+
+// ---------- persistence (per-viewer convenience only) ----------
+try {
+  const savedWallet = localStorage.getItem("orca_wallet");
+  const savedRpc = localStorage.getItem("orca_rpc");
+  if (savedWallet) walletInput.value = savedWallet;
+  if (savedRpc) rpcInput.value = savedRpc;
+} catch (e) { /* storage unavailable, ignore */ }
+
+// RPC is saved as soon as it's changed (blur/Enter), independent of ever loading
+// positions, so it's remembered even if the wallet field is empty or invalid.
+rpcInput.addEventListener("change", () => {
+  try { localStorage.setItem("orca_rpc", rpcInput.value.trim()); } catch (e) { /* ignore */ }
+});
+
+clearWalletBtn.addEventListener("click", () => {
+  walletInput.value = "";
+  try { localStorage.removeItem("orca_wallet"); } catch (e) { /* ignore */ }
+  summaryEl.innerHTML = "";
+  positionsEl.innerHTML = "";
+  setStatus("Saved wallet address deleted.");
+});
+
+// ---------- base58 ----------
+const B58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+function base58Encode(bytes) {
+  let zeros = 0;
+  while (zeros < bytes.length && bytes[zeros] === 0) zeros++;
+  let digits = [0];
+  for (let i = zeros; i < bytes.length; i++) {
+    let carry = bytes[i];
+    for (let j = 0; j < digits.length; j++) {
+      carry += digits[j] << 8;
+      digits[j] = carry % 58;
+      carry = (carry / 58) | 0;
+    }
+    while (carry > 0) {
+      digits.push(carry % 58);
+      carry = (carry / 58) | 0;
+    }
+  }
+  let s = "1".repeat(zeros);
+  for (let i = digits.length - 1; i >= 0; i--) s += B58_ALPHABET[digits[i]];
+  return s;
+}
+function base58Decode(str) {
+  let bytes = [0];
+  for (const ch of str) {
+    const val = B58_ALPHABET.indexOf(ch);
+    if (val === -1) throw new Error("Invalid base58 character in address");
+    let carry = val;
+    for (let j = 0; j < bytes.length; j++) {
+      carry += bytes[j] * 58;
+      bytes[j] = carry & 0xff;
+      carry >>= 8;
+    }
+    while (carry > 0) {
+      bytes.push(carry & 0xff);
+      carry >>= 8;
+    }
+  }
+  let zeros = 0;
+  for (const ch of str) { if (ch === "1") zeros++; else break; }
+  const out = new Uint8Array(zeros + bytes.length);
+  out.set(bytes.reverse(), zeros);
+  return out;
+}
+
+function concatBytes(...arrs) {
+  let len = 0;
+  for (const a of arrs) len += a.length;
+  const out = new Uint8Array(len);
+  let o = 0;
+  for (const a of arrs) { out.set(a, o); o += a.length; }
+  return out;
+}
+function b64ToBytes(b64) {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+function isZero32(buf, off) {
+  for (let i = 0; i < 32; i++) if (buf[off + i] !== 0) return false;
+  return true;
+}
+
+async function sha256(bytes) {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return new Uint8Array(digest);
+}
+
+// Solana PDAs are the first off-curve hash found starting from bump 255 downward.
+// Rather than implement ed25519 on-curve checking, we brute-force a handful of
+// candidate bumps and let the RPC tell us (via getMultipleAccounts) which address
+// actually exists and is owned by the program -- the canonical bump is almost
+// always within the first few tries.
+async function candidateAddresses(seeds, programIdB58, tries = PDA_BUMP_TRIES) {
+  const programId = base58Decode(programIdB58);
+  const marker = new TextEncoder().encode("ProgramDerivedAddress");
+  const out = [];
+  for (let bump = 255; bump > 255 - tries; bump--) {
+    const data = concatBytes(...seeds, new Uint8Array([bump]), programId, marker);
+    const hash = await sha256(data);
+    out.push(base58Encode(hash));
+  }
+  return out;
+}
+
+// ---------- RPC ----------
+function rpcUrl() {
+  return (rpcInput.value || "").trim();
+}
+let rpcIdCounter = 1;
+async function rpc(method, params) {
+  const res = await fetch(rpcUrl(), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: rpcIdCounter++, method, params }),
+  });
+  if (!res.ok) throw new Error(`RPC HTTP ${res.status} calling ${method}`);
+  const json = await res.json();
+  if (json.error) throw new Error(`RPC error on ${method}: ${json.error.message || JSON.stringify(json.error)}`);
+  return json.result;
+}
+function chunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+async function getMultipleAccountsMap(addresses) {
+  const map = new Map();
+  const unique = [...new Set(addresses)];
+  for (const group of chunk(unique, 100)) {
+    const result = await rpc("getMultipleAccounts", [group, { encoding: "base64" }]);
+    result.value.forEach((info, i) => { if (info) map.set(group[i], info); });
+  }
+  return map;
+}
+
+// Resolves each seed-set to the one candidate address that exists on-chain and is
+// owned by `ownerProgram`, batching every candidate across every seed-set into as
+// few getMultipleAccounts calls as possible.
+async function resolveAccountsBySeeds(seedSets, ownerProgram) {
+  const perSetCandidates = await Promise.all(seedSets.map(s => candidateAddresses(s, ownerProgram)));
+  const allCandidates = perSetCandidates.flat();
+  const infoMap = await getMultipleAccountsMap(allCandidates);
+  return perSetCandidates.map(candidates => {
+    for (const addr of candidates) {
+      const info = infoMap.get(addr);
+      if (info && info.owner === ownerProgram) return { address: addr, data: b64ToBytes(info.data[0]) };
+    }
+    return null;
+  });
+}
+
+// ---------- account layout decoding ----------
+function readU16(buf, off) { return buf[off] | (buf[off + 1] << 8); }
+function readI32(buf, off) {
+  const v = buf[off] | (buf[off + 1] << 8) | (buf[off + 2] << 16) | (buf[off + 3] << 24);
+  return v | 0;
+}
+function readU64(buf, off) {
+  let v = 0n;
+  for (let i = 7; i >= 0; i--) v = (v << 8n) | BigInt(buf[off + i]);
+  return v;
+}
+function readU128(buf, off) {
+  let v = 0n;
+  for (let i = 15; i >= 0; i--) v = (v << 8n) | BigInt(buf[off + i]);
+  return v;
+}
+function readPubkey(buf, off) { return base58Encode(buf.slice(off, off + 32)); }
+
+function decodePosition(buf) {
+  let o = 8;
+  const whirlpool = readPubkey(buf, o); o += 32;
+  const position_mint = readPubkey(buf, o); o += 32;
+  const liquidity = readU128(buf, o); o += 16;
+  const tick_lower_index = readI32(buf, o); o += 4;
+  const tick_upper_index = readI32(buf, o); o += 4;
+  const fee_growth_checkpoint_a = readU128(buf, o); o += 16;
+  const fee_owed_a = readU64(buf, o); o += 8;
+  const fee_growth_checkpoint_b = readU128(buf, o); o += 16;
+  const fee_owed_b = readU64(buf, o); o += 8;
+  const reward_infos = [];
+  for (let i = 0; i < 3; i++) {
+    const growth = readU128(buf, o); o += 16;
+    const owed = readU64(buf, o); o += 8;
+    reward_infos.push({ growth_inside_checkpoint: growth, amount_owed: owed });
+  }
+  return { whirlpool, position_mint, liquidity, tick_lower_index, tick_upper_index,
+    fee_growth_checkpoint_a, fee_owed_a, fee_growth_checkpoint_b, fee_owed_b, reward_infos };
+}
+
+function decodeWhirlpool(buf) {
+  let o = 8;
+  o += 32 + 1; // config, bump
+  const tick_spacing = readU16(buf, o); o += 2;
+  o += 2; // tick_spacing_seed
+  const fee_rate = readU16(buf, o); o += 2;
+  o += 2; // protocol_fee_rate
+  const liquidity = readU128(buf, o); o += 16;
+  const sqrt_price = readU128(buf, o); o += 16;
+  const tick_current_index = readI32(buf, o); o += 4;
+  o += 8 + 8; // protocol_fee_owed a/b
+  const token_mint_a = readPubkey(buf, o); o += 32;
+  o += 32; // token_vault_a
+  const fee_growth_global_a = readU128(buf, o); o += 16;
+  const token_mint_b = readPubkey(buf, o); o += 32;
+  o += 32; // token_vault_b
+  const fee_growth_global_b = readU128(buf, o); o += 16;
+  o += 8; // reward_last_updated_timestamp
+  const reward_infos = [];
+  for (let i = 0; i < 3; i++) {
+    const mintOff = o;
+    const mint = readPubkey(buf, o); o += 32;
+    o += 32; // vault
+    o += 32; // authority
+    o += 16; // emissions_per_second_x64
+    const growth_global_x64 = readU128(buf, o); o += 16;
+    reward_infos.push({ mint, isSet: !isZero32(buf, mintOff), growth_global_x64 });
+  }
+  return { tick_spacing, fee_rate, liquidity, sqrt_price, tick_current_index,
+    token_mint_a, fee_growth_global_a, token_mint_b, fee_growth_global_b, reward_infos };
+}
+
+function decodeTickArray(buf) {
+  let o = 8;
+  const start_tick_index = readI32(buf, o); o += 4;
+  const ticks = [];
+  for (let i = 0; i < TICKS_PER_ARRAY; i++) {
+    let p = o + 1 + 16 + 16; // skip initialized, liquidity_net, liquidity_gross
+    const fee_growth_outside_a = readU128(buf, p); p += 16;
+    const fee_growth_outside_b = readU128(buf, p); p += 16;
+    const reward_growths_outside = [readU128(buf, p), readU128(buf, p + 16), readU128(buf, p + 32)];
+    ticks.push({ fee_growth_outside_a, fee_growth_outside_b, reward_growths_outside });
+    o += TICK_SIZE;
+  }
+  return { start_tick_index, ticks };
+}
+
+function tickArrayStartIndex(tickIndex, tickSpacing) {
+  const ticksInArray = tickSpacing * TICKS_PER_ARRAY;
+  return Math.floor(tickIndex / ticksInArray) * ticksInArray;
+}
+
+function growthInside(tickCurrent, tickLower, tickUpper, growthGlobal, lowerOutside, upperOutside) {
+  let below, above;
+  if (tickCurrent >= tickLower) below = lowerOutside; else below = (growthGlobal - lowerOutside) & MASK128;
+  if (tickCurrent < tickUpper) above = upperOutside; else above = (growthGlobal - upperOutside) & MASK128;
+  return (growthGlobal - below - above) & MASK128;
+}
+
+// ---------- SPL mint decimals (offset 44 is identical for Token and Token-2022 base layout) ----------
+function decodeMintDecimals(buf) { return buf[44]; }
+
+// ---------- display helpers ----------
+function formatAmount(raw, decimals) {
+  const neg = raw < 0n;
+  const abs = neg ? -raw : raw;
+  const s = abs.toString().padStart(decimals + 1, "0");
+  const whole = s.slice(0, s.length - decimals) || "0";
+  let frac = decimals > 0 ? s.slice(s.length - decimals) : "";
+  frac = frac.replace(/0+$/, "");
+  const num = frac ? `${whole}.${frac}` : whole;
+  return (neg ? "-" : "") + Number(num).toLocaleString(undefined, { maximumFractionDigits: 8 });
+}
+function shortAddr(a) { return a.slice(0, 4) + "..." + a.slice(-4); }
+function formatUsd(n) {
+  if (n == null || !isFinite(n)) return null;
+  return n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: n < 1 ? 4 : 2 });
+}
+function tickToPrice(tick, decimalsA, decimalsB) {
+  return Math.pow(1.0001, tick) * Math.pow(10, decimalsA - decimalsB);
+}
+
+function setStatus(msg, isError) {
+  statusEl.textContent = msg;
+  statusEl.className = isError ? "error" : "";
+}
+
+async function loadTokenMeta(mints) {
+  const meta = new Map();
+  const unique = [...new Set(mints)];
+  if (!unique.length) return meta;
+  try {
+    const res = await fetch(`https://lite-api.jup.ag/tokens/v2/search?query=${unique.join(",")}`);
+    if (res.ok) {
+      const list = await res.json();
+      for (const t of list) meta.set(t.id, { symbol: t.symbol, name: t.name, usdPrice: t.usdPrice, decimals: t.decimals });
+    }
+  } catch (e) { /* best-effort enrichment only */ }
+  return meta;
+}
+
+async function findWalletPositions(owner) {
+  const candidateMints = [];
+  for (const programId of [TOKEN_PROGRAM, TOKEN_2022_PROGRAM]) {
+    const resp = await rpc("getTokenAccountsByOwner", [owner, { programId }, { encoding: "jsonParsed" }]);
+    for (const { account } of resp.value) {
+      const info = account.data.parsed.info;
+      if (info.tokenAmount.decimals === 0 && info.tokenAmount.amount === "1") candidateMints.push(info.mint);
+    }
+  }
+  if (!candidateMints.length) return [];
+
+  const seedSets = candidateMints.map(mint => [new TextEncoder().encode("position"), base58Decode(mint)]);
+  const resolved = await resolveAccountsBySeeds(seedSets, WHIRLPOOL_PROGRAM);
+
+  const positions = [];
+  resolved.forEach((acc, i) => {
+    if (!acc) return;
+    const pos = decodePosition(acc.data);
+    if (pos.liquidity === 0n && pos.fee_owed_a === 0n && pos.fee_owed_b === 0n &&
+        pos.reward_infos.every(r => r.amount_owed === 0n)) return; // fully closed/empty, skip
+    positions.push({ address: acc.address, mint: candidateMints[i], ...pos });
+  });
+  return positions;
+}
+
+async function enrichPositions(positions) {
+  const whirlpoolAddrs = [...new Set(positions.map(p => p.whirlpool))];
+  const whirlpoolInfoMap = await getMultipleAccountsMap(whirlpoolAddrs);
+  const whirlpools = new Map();
+  for (const addr of whirlpoolAddrs) {
+    const info = whirlpoolInfoMap.get(addr);
+    if (info) whirlpools.set(addr, decodeWhirlpool(b64ToBytes(info.data[0])));
+  }
+
+  // Resolve the lower+upper tick array for every position in one batched call.
+  const tickArraySeedSets = [];
+  const tickArrayMeta = [];
+  positions.forEach(pos => {
+    const wp = whirlpools.get(pos.whirlpool);
+    if (!wp) return;
+    const lowerStart = tickArrayStartIndex(pos.tick_lower_index, wp.tick_spacing);
+    const upperStart = tickArrayStartIndex(pos.tick_upper_index, wp.tick_spacing);
+    for (const startIndex of new Set([lowerStart, upperStart])) {
+      tickArraySeedSets.push([
+        new TextEncoder().encode("tick_array"),
+        base58Decode(pos.whirlpool),
+        new TextEncoder().encode(String(startIndex)),
+      ]);
+      tickArrayMeta.push({ whirlpool: pos.whirlpool, startIndex });
+    }
+  });
+  const resolvedArrays = await resolveAccountsBySeeds(tickArraySeedSets, WHIRLPOOL_PROGRAM);
+  const tickArrayByKey = new Map();
+  resolvedArrays.forEach((acc, i) => {
+    const key = tickArrayMeta[i].whirlpool + ":" + tickArrayMeta[i].startIndex;
+    if (acc) tickArrayByKey.set(key, decodeTickArray(acc.data));
+  });
+
+  // Mint decimals (on-chain, authoritative).
+  const allMints = new Set();
+  whirlpools.forEach(wp => {
+    allMints.add(wp.token_mint_a); allMints.add(wp.token_mint_b);
+    wp.reward_infos.forEach(r => { if (r.isSet) allMints.add(r.mint); });
+  });
+  const mintInfoMap = await getMultipleAccountsMap([...allMints]);
+  const decimalsByMint = new Map();
+  mintInfoMap.forEach((info, addr) => decimalsByMint.set(addr, decodeMintDecimals(b64ToBytes(info.data[0]))));
+
+  const tokenMeta = await loadTokenMeta([...allMints]);
+
+  const results = [];
+  for (const pos of positions) {
+    const wp = whirlpools.get(pos.whirlpool);
+    if (!wp) { results.push({ pos, error: "Could not load this position's pool account." }); continue; }
+    const lowerStart = tickArrayStartIndex(pos.tick_lower_index, wp.tick_spacing);
+    const upperStart = tickArrayStartIndex(pos.tick_upper_index, wp.tick_spacing);
+    const lowerArray = tickArrayByKey.get(pos.whirlpool + ":" + lowerStart);
+    const upperArray = tickArrayByKey.get(pos.whirlpool + ":" + upperStart);
+    if (!lowerArray || !upperArray) { results.push({ pos, wp, error: "Could not load this position's tick-range data." }); continue; }
+
+    const lowerTick = lowerArray.ticks[(pos.tick_lower_index - lowerArray.start_tick_index) / wp.tick_spacing];
+    const upperTick = upperArray.ticks[(pos.tick_upper_index - upperArray.start_tick_index) / wp.tick_spacing];
+
+    const feeGrowthInsideA = growthInside(wp.tick_current_index, pos.tick_lower_index, pos.tick_upper_index,
+      wp.fee_growth_global_a, lowerTick.fee_growth_outside_a, upperTick.fee_growth_outside_a);
+    const feeGrowthInsideB = growthInside(wp.tick_current_index, pos.tick_lower_index, pos.tick_upper_index,
+      wp.fee_growth_global_b, lowerTick.fee_growth_outside_b, upperTick.fee_growth_outside_b);
+    const pendingFeeA = (pos.fee_owed_a + (((pos.liquidity * ((feeGrowthInsideA - pos.fee_growth_checkpoint_a) & MASK128)) & MASK128) >> 64n)) & MASK64;
+    const pendingFeeB = (pos.fee_owed_b + (((pos.liquidity * ((feeGrowthInsideB - pos.fee_growth_checkpoint_b) & MASK128)) & MASK128) >> 64n)) & MASK64;
+
+    const rewards = [];
+    wp.reward_infos.forEach((rInfo, i) => {
+      if (!rInfo.isSet) return;
+      const growthInsideReward = growthInside(wp.tick_current_index, pos.tick_lower_index, pos.tick_upper_index,
+        rInfo.growth_global_x64, lowerTick.reward_growths_outside[i], upperTick.reward_growths_outside[i]);
+      const checkpoint = pos.reward_infos[i].growth_inside_checkpoint;
+      const pending = (pos.reward_infos[i].amount_owed + (((pos.liquidity * ((growthInsideReward - checkpoint) & MASK128)) & MASK128) >> 64n)) & MASK64;
+      rewards.push({ mint: rInfo.mint, pending });
+    });
+
+    const decimalsA = decimalsByMint.get(wp.token_mint_a) ?? 0;
+    const decimalsB = decimalsByMint.get(wp.token_mint_b) ?? 0;
+    const inRange = wp.tick_current_index >= pos.tick_lower_index && wp.tick_current_index < pos.tick_upper_index;
+
+    // Approximate current-price token split for the liquidity itself (display only,
+    // uses floating point since this is not a fee/accounting-critical figure).
+    const sqrtCurrent = Number(wp.sqrt_price) / Math.pow(2, 64);
+    const sqrtLower = Math.pow(1.0001, pos.tick_lower_index / 2);
+    const sqrtUpper = Math.pow(1.0001, pos.tick_upper_index / 2);
+    const liq = Number(pos.liquidity);
+    let amountA = 0, amountB = 0;
+    if (wp.tick_current_index < pos.tick_lower_index) {
+      amountA = liq * (1 / sqrtLower - 1 / sqrtUpper);
+    } else if (wp.tick_current_index >= pos.tick_upper_index) {
+      amountB = liq * (sqrtUpper - sqrtLower);
+    } else {
+      amountA = liq * (1 / sqrtCurrent - 1 / sqrtUpper);
+      amountB = liq * (sqrtCurrent - sqrtLower);
+    }
+    amountA = amountA / Math.pow(10, decimalsA);
+    amountB = amountB / Math.pow(10, decimalsB);
+
+    const priceLower = tickToPrice(pos.tick_lower_index, decimalsA, decimalsB);
+    const priceUpper = tickToPrice(pos.tick_upper_index, decimalsA, decimalsB);
+    const priceCurrent = tickToPrice(wp.tick_current_index, decimalsA, decimalsB);
+
+    results.push({
+      pos, wp, inRange,
+      tokenA: { mint: wp.token_mint_a, decimals: decimalsA, meta: tokenMeta.get(wp.token_mint_a), amount: amountA, pendingFee: pendingFeeA },
+      tokenB: { mint: wp.token_mint_b, decimals: decimalsB, meta: tokenMeta.get(wp.token_mint_b), amount: amountB, pendingFee: pendingFeeB },
+      rewards: rewards.map(r => ({ ...r, decimals: decimalsByMint.get(r.mint) ?? 0, meta: tokenMeta.get(r.mint) })),
+      priceLower, priceUpper, priceCurrent,
+    });
+  }
+  return results;
+}
+
+function renderToken(entry, side) {
+  const symbol = entry.meta?.symbol || shortAddr(entry.mint);
+  const feeAmount = formatAmount(entry.pendingFee, entry.decimals);
+  const usd = entry.meta?.usdPrice ? formatUsd(Number(entry.pendingFee) / Math.pow(10, entry.decimals) * entry.meta.usdPrice) : null;
+  return `<div class="yield-line"><span>${symbol} fees</span><span>${feeAmount}${usd ? ` <span class="usd">(${usd})</span>` : ""}</span></div>`;
+}
+
+function renderPosition(r) {
+  if (r.error) {
+    return `<div class="position"><div class="head"><span class="pair">Position ${shortAddr(r.pos.address)}</span></div><div class="error-box">${r.error}</div></div>`;
+  }
+  const symA = r.tokenA.meta?.symbol || shortAddr(r.tokenA.mint);
+  const symB = r.tokenB.meta?.symbol || shortAddr(r.tokenB.mint);
+  let totalUsd = 0, hasUsd = false;
+  if (r.tokenA.meta?.usdPrice) { totalUsd += Number(r.tokenA.pendingFee) / Math.pow(10, r.tokenA.decimals) * r.tokenA.meta.usdPrice; hasUsd = true; }
+  if (r.tokenB.meta?.usdPrice) { totalUsd += Number(r.tokenB.pendingFee) / Math.pow(10, r.tokenB.decimals) * r.tokenB.meta.usdPrice; hasUsd = true; }
+  const rewardLines = r.rewards.map(rw => {
+    const sym = rw.meta?.symbol || shortAddr(rw.mint);
+    const amt = formatAmount(rw.pending, rw.decimals);
+    if (rw.meta?.usdPrice) { totalUsd += Number(rw.pending) / Math.pow(10, rw.decimals) * rw.meta.usdPrice; hasUsd = true; }
+    const usd = rw.meta?.usdPrice ? formatUsd(Number(rw.pending) / Math.pow(10, rw.decimals) * rw.meta.usdPrice) : null;
+    return `<div class="yield-line"><span>${sym} reward</span><span>${amt}${usd ? ` <span class="usd">(${usd})</span>` : ""}</span></div>`;
+  }).join("");
+
+  return `
+  <div class="position">
+    <div class="head">
+      <span class="pair">${symA} / ${symB}</span>
+      <span class="badge ${r.inRange ? "inrange" : "outrange"}">${r.inRange ? "In range" : "Out of range"}</span>
+    </div>
+    <div class="mint-link">Position NFT ${shortAddr(r.pos.mint)} &middot; Pool ${shortAddr(r.pos.whirlpool)}</div>
+    <div class="cols">
+      <div>
+        <h4>Position (approx. at current price)</h4>
+        <div class="amount-line"><span>${symA}</span><span>${formatAmount(BigInt(Math.round(r.tokenA.amount * Math.pow(10, r.tokenA.decimals))), r.tokenA.decimals)}</span></div>
+        <div class="amount-line"><span>${symB}</span><span>${formatAmount(BigInt(Math.round(r.tokenB.amount * Math.pow(10, r.tokenB.decimals))), r.tokenB.decimals)}</span></div>
+        <div class="range">Range: ${r.priceLower < 0.0001 ? r.priceLower.toExponential(2) : r.priceLower.toPrecision(4)} &ndash; ${r.priceUpper < 0.0001 ? r.priceUpper.toExponential(2) : r.priceUpper.toPrecision(4)} ${symB} per ${symA}<br>Current: ${r.priceCurrent.toPrecision(4)} ${symB} per ${symA}</div>
+      </div>
+      <div>
+        <h4>Pending yield (claimable now)</h4>
+        ${renderToken(r.tokenA, "A")}
+        ${renderToken(r.tokenB, "B")}
+        ${rewardLines}
+        ${hasUsd ? `<div class="yield-line" style="border-top:1px solid var(--border); margin-top:6px; padding-top:8px;"><span>Est. total</span><span class="value green">${formatUsd(totalUsd)}</span></div>` : ""}
+      </div>
+    </div>
+  </div>`;
+}
+
+async function run() {
+  if (!rpcUrl()) { setStatus("Enter an RPC endpoint first (see above) -- Solana's public RPC blocks browser requests.", true); return; }
+  const wallet = walletInput.value.trim();
+  if (!wallet) { setStatus("Enter a wallet address.", true); return; }
+  let ownerBytes;
+  try { ownerBytes = base58Decode(wallet); } catch (e) { setStatus("That doesn't look like a valid Solana address.", true); return; }
+  if (ownerBytes.length !== 32) { setStatus("That doesn't look like a valid Solana address (wrong length).", true); return; }
+
+  try { localStorage.setItem("orca_wallet", wallet); } catch (e) { /* ignore */ }
+
+  loadBtn.disabled = true;
+  summaryEl.innerHTML = "";
+  positionsEl.innerHTML = "";
+  setStatus("Scanning wallet for Orca position NFTs...");
+  try {
+    const positions = await findWalletPositions(wallet);
+    if (!positions.length) {
+      setStatus("");
+      positionsEl.innerHTML = `<div class="empty">No open Orca Whirlpool positions found for this wallet.</div>`;
+      return;
+    }
+    setStatus(`Found ${positions.length} position${positions.length === 1 ? "" : "s"}. Loading pool & fee data...`);
+    const enriched = await enrichPositions(positions);
+
+    let totalUsd = 0, hasUsd = false, inRangeCount = 0;
+    enriched.forEach(r => {
+      if (r.error) return;
+      if (r.inRange) inRangeCount++;
+      [r.tokenA, r.tokenB].forEach(t => { if (t.meta?.usdPrice) { totalUsd += Number(t.pendingFee) / Math.pow(10, t.decimals) * t.meta.usdPrice; hasUsd = true; } });
+      r.rewards.forEach(rw => { if (rw.meta?.usdPrice) { totalUsd += Number(rw.pending) / Math.pow(10, rw.decimals) * rw.meta.usdPrice; hasUsd = true; } });
+    });
+
+    summaryEl.innerHTML = `
+      <div class="panel">
+        <div class="summary-grid">
+          <div class="stat"><div class="label">Positions</div><div class="value">${enriched.length}</div></div>
+          <div class="stat"><div class="label">In range</div><div class="value">${inRangeCount} / ${enriched.length}</div></div>
+          <div class="stat"><div class="label">Est. pending yield</div><div class="value green">${hasUsd ? formatUsd(totalUsd) : "—"}</div></div>
+        </div>
+      </div>`;
+    positionsEl.innerHTML = enriched.map(renderPosition).join("");
+    setStatus("");
+  } catch (e) {
+    console.error(e);
+    setStatus(`Failed: ${e.message}. If this is a rate limit, try again shortly or set a different RPC endpoint under Advanced settings.`, true);
+  } finally {
+    loadBtn.disabled = false;
+  }
+}
+
+loadBtn.addEventListener("click", run);
+walletInput.addEventListener("keydown", e => { if (e.key === "Enter") run(); });
+</script>
+</body>
+</html>
