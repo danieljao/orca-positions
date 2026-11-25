@@ -117,6 +117,22 @@
   .empty, .error-box { color: var(--muted); font-size: 14px; padding: 20px; text-align: center; }
   .error-box { color: var(--red); }
   a { color: var(--accent); }
+  #savedWallets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  #savedWallets:empty { display: none; }
+  .wallet-chip {
+    display: inline-flex; align-items: center;
+    border: 1px solid var(--border); border-radius: 999px;
+    background: var(--bg); overflow: hidden;
+  }
+  .wallet-chip.active { border-color: var(--accent); }
+  .wallet-chip button {
+    background: transparent; color: var(--text); border-radius: 0;
+    font-weight: 500; font-size: 13px; padding: 7px 10px;
+  }
+  .wallet-chip .chip-load { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; padding-left: 14px; }
+  .wallet-chip.active .chip-load { color: var(--accent); }
+  .wallet-chip .chip-remove { color: var(--muted); padding: 7px 12px 7px 6px; font-size: 15px; line-height: 1; }
+  .wallet-chip .chip-remove:hover { color: var(--red); }
 </style>
 </head>
 <body>
@@ -142,6 +158,7 @@
         <button id="clearWalletBtn" style="background: transparent; color: var(--muted); border: 1px solid var(--border);">Delete</button>
       </div>
     </div>
+    <div id="savedWallets" aria-label="Saved wallets"></div>
     <div id="status"></div>
   </div>
 
@@ -166,14 +183,86 @@ const clearWalletBtn = document.getElementById("clearWalletBtn");
 const statusEl = document.getElementById("status");
 const summaryEl = document.getElementById("summaryPanel");
 const positionsEl = document.getElementById("positions");
+const savedWalletsEl = document.getElementById("savedWallets");
 
 // ---------- persistence (per-viewer convenience only) ----------
+// Saved wallets are a JSON array in "orca_wallets", most recently used first.
+const WALLETS_KEY = "orca_wallets";
+
+function loadSavedWallets() {
+  try {
+    const list = JSON.parse(localStorage.getItem(WALLETS_KEY) || "[]");
+    if (Array.isArray(list)) return list.filter(w => typeof w === "string" && w);
+  } catch (e) { /* ignore */ }
+  return [];
+}
+
+function storeSavedWallets(list) {
+  try { localStorage.setItem(WALLETS_KEY, JSON.stringify(list)); } catch (e) { /* ignore */ }
+}
+
+function rememberWallet(wallet) {
+  storeSavedWallets([wallet, ...loadSavedWallets().filter(w => w !== wallet)]);
+  renderSavedWallets();
+}
+
+function forgetWallet(wallet) {
+  storeSavedWallets(loadSavedWallets().filter(w => w !== wallet));
+  renderSavedWallets();
+}
+
+function shortAddr(a) {
+  return a.length > 12 ? `${a.slice(0, 4)}…${a.slice(-4)}` : a;
+}
+
+function renderSavedWallets() {
+  const current = walletInput.value.trim();
+  savedWalletsEl.innerHTML = "";
+  loadSavedWallets().forEach(w => {
+    const chip = document.createElement("span");
+    chip.className = "wallet-chip" + (w === current ? " active" : "");
+    const loadB = document.createElement("button");
+    loadB.className = "chip-load";
+    loadB.textContent = shortAddr(w);
+    loadB.title = `View positions for ${w}`;
+    loadB.addEventListener("click", () => {
+      if (loadBtn.disabled) return;
+      walletInput.value = w;
+      run();
+    });
+    const removeB = document.createElement("button");
+    removeB.className = "chip-remove";
+    removeB.textContent = "×";
+    removeB.title = "Remove this saved wallet";
+    removeB.setAttribute("aria-label", `Remove saved wallet ${w}`);
+    removeB.addEventListener("click", () => {
+      forgetWallet(w);
+      if (walletInput.value.trim() === w) {
+        walletInput.value = "";
+        summaryEl.innerHTML = "";
+        positionsEl.innerHTML = "";
+      }
+      setStatus("Saved wallet removed.");
+    });
+    chip.append(loadB, removeB);
+    savedWalletsEl.appendChild(chip);
+  });
+}
+
 try {
-  const savedWallet = localStorage.getItem("orca_wallet");
+  // One-time migration from the old single-wallet key.
+  const legacy = localStorage.getItem("orca_wallet");
+  if (legacy) {
+    if (!loadSavedWallets().includes(legacy)) storeSavedWallets([...loadSavedWallets(), legacy]);
+    localStorage.removeItem("orca_wallet");
+  }
   const savedRpc = localStorage.getItem("orca_rpc");
-  if (savedWallet) walletInput.value = savedWallet;
   if (savedRpc) rpcInput.value = savedRpc;
 } catch (e) { /* storage unavailable, ignore */ }
+
+const initialWallets = loadSavedWallets();
+if (initialWallets.length) walletInput.value = initialWallets[0];
+renderSavedWallets();
 
 // RPC is saved as soon as it's changed (blur/Enter), independent of ever loading
 // positions, so it's remembered even if the wallet field is empty or invalid.
@@ -181,12 +270,16 @@ rpcInput.addEventListener("change", () => {
   try { localStorage.setItem("orca_rpc", rpcInput.value.trim()); } catch (e) { /* ignore */ }
 });
 
+// Delete removes the wallet currently in the field from the saved list.
 clearWalletBtn.addEventListener("click", () => {
+  const wallet = walletInput.value.trim();
+  const wasSaved = wallet && loadSavedWallets().includes(wallet);
+  if (wasSaved) forgetWallet(wallet);
   walletInput.value = "";
-  try { localStorage.removeItem("orca_wallet"); } catch (e) { /* ignore */ }
+  renderSavedWallets();
   summaryEl.innerHTML = "";
   positionsEl.innerHTML = "";
-  setStatus("Saved wallet address deleted.");
+  setStatus(wasSaved ? "Saved wallet address deleted." : "Cleared.");
 });
 
 // ---------- base58 ----------
@@ -656,7 +749,7 @@ async function run() {
   try { ownerBytes = base58Decode(wallet); } catch (e) { setStatus("That doesn't look like a valid Solana address.", true); return; }
   if (ownerBytes.length !== 32) { setStatus("That doesn't look like a valid Solana address (wrong length).", true); return; }
 
-  try { localStorage.setItem("orca_wallet", wallet); } catch (e) { /* ignore */ }
+  rememberWallet(wallet);
 
   loadBtn.disabled = true;
   summaryEl.innerHTML = "";
