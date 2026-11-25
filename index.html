@@ -211,10 +211,6 @@ function forgetWallet(wallet) {
   renderSavedWallets();
 }
 
-function shortAddr(a) {
-  return a.length > 12 ? `${a.slice(0, 4)}…${a.slice(-4)}` : a;
-}
-
 function renderSavedWallets() {
   const current = walletInput.value.trim();
   savedWalletsEl.innerHTML = "";
