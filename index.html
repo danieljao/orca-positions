@@ -164,6 +164,7 @@
 
   <div id="summaryPanel"></div>
   <div id="positions"></div>
+  <div id="version" style="color: var(--muted); font-size: 11px; text-align: center; margin: 24px 0 8px;"></div>
 </div>
 
 <script type="module">
@@ -184,6 +185,22 @@ const statusEl = document.getElementById("status");
 const summaryEl = document.getElementById("summaryPanel");
 const positionsEl = document.getElementById("positions");
 const savedWalletsEl = document.getElementById("savedWallets");
+
+// ---------- version ----------
+// Bump APP_VERSION with each change. The "deployed" time comes from the server's
+// Last-Modified header for this file, so it updates automatically on every deploy.
+const APP_VERSION = "2026.11.25-2 (multi-wallet)";
+const versionEl = document.getElementById("version");
+versionEl.textContent = `Version ${APP_VERSION}`;
+fetch(location.href, { method: "HEAD", cache: "no-store" })
+  .then(res => {
+    const lm = res.headers.get("last-modified");
+    if (!lm) return;
+    const d = new Date(lm);
+    if (isNaN(d)) return;
+    versionEl.textContent = `Version ${APP_VERSION} · deployed ${d.toLocaleString()}`;
+  })
+  .catch(() => { /* offline or opened from disk; version label alone is fine */ });
 
 // ---------- persistence (per-viewer convenience only) ----------
 // Saved wallets are a JSON array in "orca_wallets", most recently used first.
