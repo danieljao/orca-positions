@@ -117,12 +117,16 @@
   .empty, .error-box { color: var(--muted); font-size: 14px; padding: 20px; text-align: center; }
   .error-box { color: var(--red); }
   a { color: var(--accent); }
-  #savedWallets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  #savedWallets { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
   #savedWallets:empty { display: none; }
   .wallet-chip {
-    display: inline-flex; align-items: center;
-    border: 1px solid var(--border); border-radius: 999px;
+    display: flex; align-items: center;
+    border: 1px solid var(--border); border-radius: 8px;
     background: var(--bg); overflow: hidden;
+  }
+  .wallet-chip .chip-load {
+    flex: 1; min-width: 0; text-align: left;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .wallet-chip.active { border-color: var(--accent); }
   .wallet-chip button {
@@ -190,7 +194,7 @@ const savedWalletsEl = document.getElementById("savedWallets");
 // ---------- version ----------
 // Bump APP_VERSION with each change. The "deployed" time comes from the server's
 // Last-Modified header for this file, so it updates automatically on every deploy.
-const APP_VERSION = "2026.11.26-1 (SOL price)";
+const APP_VERSION = "2026.11.26-2 (wallet rows)";
 const versionEl = document.getElementById("version");
 versionEl.textContent = `Version ${APP_VERSION}`;
 fetch(location.href, { method: "HEAD", cache: "no-store" })
@@ -268,7 +272,7 @@ function renderSavedWallets() {
     chip.className = "wallet-chip" + (w === current ? " active" : "");
     const loadB = document.createElement("button");
     loadB.className = "chip-load";
-    loadB.textContent = shortAddr(w);
+    loadB.textContent = w;
     loadB.title = `View positions for ${w}`;
     loadB.addEventListener("click", () => {
       if (loadBtn.disabled) return;
