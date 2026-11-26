@@ -138,6 +138,7 @@
 <body>
 <div class="wrap">
   <h1>Orca Whirlpool Positions</h1>
+  <div id="solPrice" style="font-size: 14px; margin: 0 0 8px;"><span style="color: var(--muted);">SOL price:</span> <strong id="solPriceValue">loading…</strong> <span id="solPriceTime" style="color: var(--muted); font-size: 12px;"></span></div>
   <p class="subtitle">Enter a Solana wallet address to see its open Orca concentrated-liquidity positions and pending yield (uncollected fees + rewards), read directly from the chain. Nothing is sent anywhere except read-only RPC calls.</p>
 
   <div class="panel">
@@ -189,7 +190,7 @@ const savedWalletsEl = document.getElementById("savedWallets");
 // ---------- version ----------
 // Bump APP_VERSION with each change. The "deployed" time comes from the server's
 // Last-Modified header for this file, so it updates automatically on every deploy.
-const APP_VERSION = "2026.11.25-2 (multi-wallet)";
+const APP_VERSION = "2026.11.26-1 (SOL price)";
 const versionEl = document.getElementById("version");
 versionEl.textContent = `Version ${APP_VERSION}`;
 fetch(location.href, { method: "HEAD", cache: "no-store" })
@@ -201,6 +202,37 @@ fetch(location.href, { method: "HEAD", cache: "no-store" })
     versionEl.textContent = `Version ${APP_VERSION} · deployed ${d.toLocaleString()}`;
   })
   .catch(() => { /* offline or opened from disk; version label alone is fine */ });
+
+// ---------- SOL price ----------
+// Refreshed on page load, whenever the page becomes visible again (switching back
+// to the tab / reopening the home-screen app), and on each positions load.
+const SOL_MINT = "So11111111111111111111111111111111111111112";
+const solPriceValueEl = document.getElementById("solPriceValue");
+const solPriceTimeEl = document.getElementById("solPriceTime");
+let solPriceLastFetch = 0;
+
+async function refreshSolPrice() {
+  if (Date.now() - solPriceLastFetch < 10000) return; // avoid hammering the API
+  solPriceLastFetch = Date.now();
+  try {
+    const res = await fetch(`https://lite-api.jup.ag/tokens/v2/search?query=${SOL_MINT}`, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const list = await res.json();
+    const sol = Array.isArray(list) ? list.find(t => t.id === SOL_MINT) : null;
+    if (!sol || typeof sol.usdPrice !== "number") throw new Error("no price");
+    solPriceValueEl.textContent = sol.usdPrice.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 });
+    solPriceTimeEl.textContent = `as of ${new Date().toLocaleTimeString()}`;
+  } catch (e) {
+    if (solPriceValueEl.textContent === "loading…") solPriceValueEl.textContent = "unavailable";
+    solPriceTimeEl.textContent = "(couldn't refresh)";
+  }
+}
+
+refreshSolPrice();
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") refreshSolPrice();
+});
+window.addEventListener("pageshow", e => { if (e.persisted) refreshSolPrice(); });
 
 // ---------- persistence (per-viewer convenience only) ----------
 // Saved wallets are a JSON array in "orca_wallets", most recently used first.
@@ -763,6 +795,7 @@ async function run() {
   if (ownerBytes.length !== 32) { setStatus("That doesn't look like a valid Solana address (wrong length).", true); return; }
 
   rememberWallet(wallet);
+  refreshSolPrice();
 
   loadBtn.disabled = true;
   summaryEl.innerHTML = "";
